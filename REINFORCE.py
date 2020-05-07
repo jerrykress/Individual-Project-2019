@@ -1,7 +1,7 @@
-import argparse
 import gym
 import numpy as np
 from itertools import count
+import matplotlib.pyplot as plt
 
 import torch
 import torch.nn as nn
@@ -10,23 +10,16 @@ import torch.optim as optim
 from torch.distributions import Categorical
 
 
-parser = argparse.ArgumentParser(description='PyTorch REINFORCE example')
-parser.add_argument('--gamma', type=float, default=0.99, metavar='G',
-                    help='discount factor (default: 0.99)')
-parser.add_argument('--seed', type=int, default=543, metavar='N',
-                    help='random seed (default: 543)')
-parser.add_argument('--render', action='store_true',
-                    help='render the environment')
-parser.add_argument('--log-interval', type=int, default=10, metavar='N',
-                    help='interval between training status logs (default: 10)')
-args = parser.parse_args()
-
-
+gamma = 0.9
+seed = 1
+render = False
+log_interval = 10 #interval between training status logs (default: 10)
 
 
 env = gym.make('CartPole-v0')
-env.seed(args.seed)
-torch.manual_seed(args.seed)
+env.seed(seed)
+torch.manual_seed(seed)
+live_rewards = []
 
 
 class Policy(nn.Module):
@@ -45,8 +38,9 @@ class Policy(nn.Module):
 
 
 policy = Policy()
-optimizer = optim.Adam(policy.parameters(), lr=1e-2)
+optimizer = optim.Adam(policy.parameters(), lr=1e-3)
 eps = np.finfo(np.float32).eps.item()
+reward_global = []
 
 
 def select_action(state):
@@ -63,7 +57,7 @@ def finish_episode():
     policy_loss = []
     rewards = []
     for r in policy.rewards[::-1]:
-        R = r + args.gamma * R
+        R = r + gamma * R
         rewards.insert(0, R)
     rewards = torch.tensor(rewards)
     rewards = (rewards - rewards.mean()) / (rewards.std() + eps)
@@ -76,30 +70,31 @@ def finish_episode():
     del policy.rewards[:]
     del policy.probs[:]
 
-
-def main():
-    running_reward = 10
-    for i_episode in count(1):
-        state = env.reset()
-        for t in range(10000):  # Don't infinite loop while learning
-            action = select_action(state)
-            state, reward, done, _ = env.step(action)
-            if args.render:
-                env.render()
-            policy.rewards.append(reward)
-            if done:
-                break
-
-        running_reward = running_reward * 0.99 + t * 0.01
-        finish_episode()
-        if i_episode % args.log_interval == 0:
-            print('Episode {}\tSteps taken: {:5d}\tReward: {:.2f}'.format(
-                i_episode, t, running_reward))
-        if running_reward > env.spec.reward_threshold:
-            print("Solved! Running reward is now {} and "
-                  "the last episode runs to {} time steps!".format(running_reward, t))
-            break
+def plot(live_time):
+    plt.ion()
+    plt.grid()
+    plt.plot(live_time, 'g-')
+    plt.xlabel('Episode')
+    plt.ylabel('Reward')
+    plt.pause(0.000001)
 
 
 if __name__ == '__main__':
-    main()
+    
+    for i_episode in range(1000):
+        state = env.reset()
+        for t in range(200): #max time step
+            action = select_action(state)
+            state, reward, done, _ = env.step(action)
+            if render:
+                env.render()
+            policy.rewards.append(reward)
+            if done:
+                live_rewards.append(t)
+                break
+        
+        plot(live_rewards)
+
+        finish_episode()
+        if i_episode % log_interval == 0:
+            print('Episode {}\tReward: {:5d}\t'.format(i_episode, t+1))
