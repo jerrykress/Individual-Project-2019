@@ -16,13 +16,14 @@ gamma = 0.90
 agent = A2CAgent(env, gamma, lr)
 live_reward = []
 
-def plot(live_time):
+def plot(episode, live_time):
     plt.ion()
     plt.grid()
     plt.plot(live_reward, 'b-')
     plt.xlabel('Episode')
     plt.ylabel('Reward')
     plt.pause(0.000001)
+    plt.savefig("a2c.png")
 
 if __name__ == '__main__':
     for episode in range(MAX_EPISODE):
@@ -43,7 +44,7 @@ if __name__ == '__main__':
                 
             state = next_state
 
-        plot(live_reward)
+        plot(episode, live_reward)
 
         if episode % 10 == 0:
             print("Episode " + str(episode) + ": " + str(episode_reward))
