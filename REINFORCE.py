@@ -94,6 +94,11 @@ if __name__ == '__main__':
                 break
         
         plot(live_rewards)
+        par = [param.data for param in policy.parameters()]
+        # print(i_episode, par[0], "\n", par[1], "\n", par[2], "\n", par[3], "\n")
+        # print(len(par), len(par[0]), len(par[1]), len(par[2]), len(par[3]))
+        for name, param in policy.named_parameters():
+            print(name)
 
         finish_episode()
         if i_episode % log_interval == 0:
