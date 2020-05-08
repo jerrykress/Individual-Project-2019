@@ -73,10 +73,11 @@ def finish_episode():
 def plot(live_time):
     plt.ion()
     plt.grid()
-    plt.plot(live_time, 'g-')
+    plt.plot(live_time, 'b-')
     plt.xlabel('Episode')
     plt.ylabel('Reward')
     plt.pause(0.000001)
+    plt.savefig("REINFORCE.png")
 
 
 if __name__ == '__main__':
@@ -97,8 +98,8 @@ if __name__ == '__main__':
         par = [param.data for param in policy.parameters()]
         # print(i_episode, par[0], "\n", par[1], "\n", par[2], "\n", par[3], "\n")
         # print(len(par), len(par[0]), len(par[1]), len(par[2]), len(par[3]))
-        for name, param in policy.named_parameters():
-            print(name)
+        # for name, param in policy.named_parameters():
+        #     print(name)
 
         finish_episode()
         if i_episode % log_interval == 0:

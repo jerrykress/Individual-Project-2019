@@ -35,6 +35,7 @@ class A3CAgent:
         plt.xlabel('Episode')
         plt.ylabel('Reward')
         plt.savefig("a3c.png")
+        plt.show()
     
     def save_model(self):
         torch.save(self.global_network.state_dict(), "a3c_model.pth")
