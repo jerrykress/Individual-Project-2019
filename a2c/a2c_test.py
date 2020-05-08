@@ -10,7 +10,7 @@ env = gym.make("CartPole-v0")
 MAX_EPISODE = 1000
 MAX_STEPS = 200
 
-lr = 5e-3
+lr = 1e-3
 gamma = 0.90
 
 agent = A2CAgent(env, gamma, lr)

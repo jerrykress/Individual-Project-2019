@@ -34,7 +34,6 @@ class A3CAgent:
         plt.plot(self.global_rewards.values(), 'b-')
         plt.xlabel('Episode')
         plt.ylabel('Reward')
-        plt.pause(0.000001)
         plt.savefig("a3c.png")
     
     def save_model(self):
