@@ -8,7 +8,7 @@ from models import TwoHeadNetwork, ValueNetwork, PolicyNetwork
 
 class Worker(mp.Process):
 
-    def __init__(self, id, env, gamma, global_network, global_optimizer, global_episode, GLOBAL_MAX_EPISODE):
+    def __init__(self, id, env, gamma, global_network, global_optimizer, global_episode, GLOBAL_MAX_EPISODE, global_rewards):
         super(Worker, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.name = "w%i" % id
@@ -21,6 +21,7 @@ class Worker(mp.Process):
         self.gamma = gamma
         self.local_network = TwoHeadNetwork(self.obs_dim, self.action_dim) 
 
+        self.global_rewards = global_rewards
         self.global_network = global_network
         self.global_episode = global_episode
         self.global_optimizer = global_optimizer
@@ -94,6 +95,7 @@ class Worker(mp.Process):
             if done:
                 with self.global_episode.get_lock():
                     self.global_episode.value += 1
+                    self.global_rewards[self.global_episode.value] = episode_reward
                 
                 print(self.name + " | episode: "+ str(self.global_episode.value) + " " + str(episode_reward))
 

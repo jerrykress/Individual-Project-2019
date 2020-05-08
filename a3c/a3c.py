@@ -6,6 +6,7 @@ import gym
 from models import TwoHeadNetwork, ValueNetwork, PolicyNetwork
 from worker import Worker, DecoupledWorker
 
+mp.set_start_method('spawn', force=True)
 
 class A3CAgent:
     
@@ -17,16 +18,17 @@ class A3CAgent:
         self.global_episode = mp.Value('i', 0)
         self.GLOBAL_MAX_EPISODE = global_max_episode
 
+        self.global_rewards = mp.Manager().dict()
         self.global_network = TwoHeadNetwork(self.env.observation_space.shape[0], self.env.action_space.n)
         self.global_optimizer = optim.Adam(self.global_network.parameters(), lr=lr) 
-        self.workers = [Worker(i, env, self.gamma, self.global_network, self.global_optimizer, self.global_episode, self.GLOBAL_MAX_EPISODE) for i in range(mp.cpu_count())]
+        self.workers = [Worker(i, env, self.gamma, self.global_network, self.global_optimizer, self.global_episode, self.GLOBAL_MAX_EPISODE, self.global_rewards) for i in range(mp.cpu_count())]
     
     def train(self):
         print("Training on {} cores".format(mp.cpu_count()))
-        input("Enter to start")
 
         [worker.start() for worker in self.workers]
         [worker.join() for worker in self.workers]
+        print(self.global_rewards)
     
     def save_model(self):
         torch.save(self.global_network.state_dict(), "a3c_model.pth")
