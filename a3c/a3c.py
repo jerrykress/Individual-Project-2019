@@ -2,6 +2,7 @@ import torch
 import torch.optim as optim
 import torch.multiprocessing as mp  
 import gym
+import matplotlib.pyplot as plt
 
 from models import TwoHeadNetwork, ValueNetwork, PolicyNetwork
 from worker import Worker, DecoupledWorker
@@ -29,6 +30,12 @@ class A3CAgent:
         [worker.start() for worker in self.workers]
         [worker.join() for worker in self.workers]
         print(self.global_rewards)
+        plt.grid()
+        plt.plot(self.global_rewards.values(), 'b-')
+        plt.xlabel('Episode')
+        plt.ylabel('Reward')
+        plt.pause(0.000001)
+        plt.savefig("a3c.png")
     
     def save_model(self):
         torch.save(self.global_network.state_dict(), "a3c_model.pth")
