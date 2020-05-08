@@ -19,6 +19,7 @@ env = gym.make('CartPole-v0')
 env.seed(0)
 np.random.seed(0)
 
+live_rewards = []
 
 class DQN:
 
@@ -29,7 +30,7 @@ class DQN:
         self.action_space = action_space
         self.state_space = state_space
         self.epsilon = 1
-        self.gamma = .95
+        self.gamma = .90
         self.batch_size = 64
         self.epsilon_min = .01
         self.epsilon_decay = .995
@@ -46,7 +47,7 @@ class DQN:
         model.compile(loss='mse', optimizer=adam(lr=self.learning_rate))
         return model
 
-    def remember(self, state, action, reward, next_state, done):
+    def memorise(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
 
     def act(self, state):
@@ -81,38 +82,44 @@ class DQN:
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
+def plot():
+    plt.ion()
+    plt.grid()
+    plt.plot(live_rewards, 'b-')
+    plt.xlabel('Episode')
+    plt.ylabel('Reward')
+    plt.pause(0.000001)
+    plt.savefig("dqn.png")
+
 
 def train_dqn(episode):
 
-    loss = []
     agent = DQN(env.action_space.n, env.observation_space.shape[0])
     for e in range(episode):
         state = env.reset()
         state = np.reshape(state, (1, 4))
-        score = 0
         max_steps = 1000
         for i in range(max_steps):
-            env.render()
+            # env.render()
             action = agent.act(state)
             next_state, reward, done, _ = env.step(action)
-            score += reward
             next_state = np.reshape(next_state, (1, 4))
-            agent.remember(state, action, reward, next_state, done)
+            agent.memorise(state, action, reward, next_state, done)
             state = next_state
             agent.replay()
             if done:
-                print("episode: {}/{}, score: {}".format(e, episode, score))
+                print("episode: {}/{}, reward: {}".format(e, episode, i))
+                live_rewards.append(i+1)
+                plot()
                 break
-        loss.append(score)
-    return loss
 
 
 def random_policy(episode, step):
 
     for i_episode in range(episode):
-        env.reset()
+        # env.reset()
         for t in range(step):
-            env.render()
+            # env.render()
             action = env.action_space.sample()
             state, reward, done, info = env.step(action)
             if done:
@@ -124,7 +131,4 @@ def random_policy(episode, step):
 if __name__ == '__main__':
 
     ep = 1000
-    loss = train_dqn(ep)
-    plt.plot([i+1 for i in range(0, ep, 2)], loss[::2])
-    plt.savefig("cart_pole.png")
-    plt.show()
+    train_dqn(ep)
