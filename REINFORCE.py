@@ -13,7 +13,8 @@ from torch.distributions import Categorical
 
 MAX_EPISODE = 1000
 
-gamma = 0.9
+gamma = 0.99 #discount factor
+lr = 1e-3
 seed = 1
 render = False
 log_interval = 10 #interval between training status logs (default: 10)
@@ -46,7 +47,7 @@ class Policy(nn.Module):
 
 
 policy = Policy()
-optimser = optim.Adam(policy.parameters(), lr=1e-2)
+optimser = optim.Adam(policy.parameters(), lr=lr)
 eps = np.finfo(np.float32).eps.item()
 
 

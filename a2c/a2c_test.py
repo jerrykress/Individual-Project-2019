@@ -11,7 +11,7 @@ MAX_EPISODE = 50
 MAX_STEPS = 200
 
 lr = 1e-3
-gamma = 0.90
+gamma = 0.99
 
 agent = A2CAgent(env, gamma, lr)
 live_reward = []

@@ -51,7 +51,7 @@ class A3CAgent:
         plt.ylabel('Runtime')
         plt.plot(self.global_runtime.values(), 'g-')
         plt.savefig("a3c.png")
-        # plt.show()
+        plt.show()
 
 
     
