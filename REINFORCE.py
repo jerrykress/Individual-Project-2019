@@ -46,7 +46,7 @@ class Policy(nn.Module):
 
 
 policy = Policy()
-optimser = optim.Adam(policy.parameters(), lr=1e-3)
+optimser = optim.Adam(policy.parameters(), lr=1e-2)
 eps = np.finfo(np.float32).eps.item()
 
 
