@@ -5,7 +5,7 @@
 #  The episode ends when the pole is more than 15 degrees from vertical,
 #  or the cart moves more than 2.4 units from the center.
 
-
+import time
 import gym
 import random
 from keras import Sequential
@@ -13,13 +13,20 @@ from collections import deque
 from keras.layers import Dense
 from keras.optimizers import adam
 import matplotlib.pyplot as plt
-
 import numpy as np
+
+MAX_EPISODE = 1000
+
 env = gym.make('CartPole-v0')
 env.seed(0)
 np.random.seed(0)
 
-live_rewards = []
+episode_rewards = []
+episode_runtime = []
+average_rewards = []
+total_rewards = 0
+total_runtime = 0
+
 
 class DQN:
 
@@ -30,10 +37,10 @@ class DQN:
         self.action_space = action_space
         self.state_space = state_space
         self.epsilon = 1
-        self.gamma = .90
-        self.batch_size = 64
+        self.gamma = .99
+        self.batch_size = 50
         self.epsilon_min = .01
-        self.epsilon_decay = .995
+        self.epsilon_decay = .99
         self.learning_rate = 0.001
         self.memory = deque(maxlen=10000)
         self.model = self.build_model()
@@ -85,17 +92,34 @@ class DQN:
 def plot():
     plt.ion()
     plt.grid()
-    plt.plot(live_rewards, 'b-')
+    plt.subplots_adjust(hspace = 0.5)
+
+    plt.subplot(311)
+    plt.title("Total Runtime: " + "{:.2f}".format(total_runtime) + " s")
     plt.xlabel('Episode')
-    plt.ylabel('Reward')
+    plt.ylabel('Episode Reward')
+    plt.plot(episode_rewards, 'b-')
+
+    plt.subplot(312)
+    plt.xlabel('Episode')
+    plt.ylabel('Average Reward')
+    plt.plot(average_rewards, 'm-')
+
+    plt.subplot(313)
+    plt.xlabel('Episode')
+    plt.ylabel('Runtime')
+    plt.plot(episode_runtime, 'g-')
     plt.pause(0.000001)
     plt.savefig("dqn.png")
+ 
 
-
-def train_dqn(episode):
+if __name__ == '__main__':
 
     agent = DQN(env.action_space.n, env.observation_space.shape[0])
-    for e in range(episode):
+
+    for episode in range(MAX_EPISODE):
+        tic = time.time()
+
         state = env.reset()
         state = np.reshape(state, (1, 4))
         max_steps = 1000
@@ -108,27 +132,14 @@ def train_dqn(episode):
             state = next_state
             agent.replay()
             if done:
-                print("episode: {}/{}, reward: {}".format(e, episode, i))
-                live_rewards.append(i+1)
+                print("Episode {}: {}".format(episode, i+1))
+                episode_rewards.append(i+1)
+                total_rewards += (i+1)
+                average_rewards.append(total_rewards/(episode+1))
                 plot()
                 break
+        
+        toc = time.time()
 
-
-def random_policy(episode, step):
-
-    for i_episode in range(episode):
-        # env.reset()
-        for t in range(step):
-            # env.render()
-            action = env.action_space.sample()
-            state, reward, done, info = env.step(action)
-            if done:
-                print("Episode finished after {} timesteps".format(t+1))
-                break
-            print("Starting next episode")
-
-
-if __name__ == '__main__':
-
-    ep = 1000
-    train_dqn(ep)
+        episode_runtime.append(toc-tic)
+        total_runtime += (toc-tic)
