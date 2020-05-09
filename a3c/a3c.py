@@ -20,9 +20,10 @@ class A3CAgent:
         self.GLOBAL_MAX_EPISODE = global_max_episode
 
         self.global_rewards = mp.Manager().dict()
+        self.global_runtime = mp.Manager().dict()
         self.global_network = TwoHeadNetwork(self.env.observation_space.shape[0], self.env.action_space.n)
         self.global_optimizer = optim.Adam(self.global_network.parameters(), lr=lr) 
-        self.workers = [Worker(i, env, self.gamma, self.global_network, self.global_optimizer, self.global_episode, self.GLOBAL_MAX_EPISODE, self.global_rewards) for i in range(mp.cpu_count())]
+        self.workers = [Worker(i, env, self.gamma, self.global_network, self.global_optimizer, self.global_episode, self.GLOBAL_MAX_EPISODE, self.global_rewards, self.global_runtime) for i in range(mp.cpu_count())]
     
     def train(self):
         print("Training on {} cores".format(mp.cpu_count()))
@@ -30,15 +31,28 @@ class A3CAgent:
         [worker.start() for worker in self.workers]
         [worker.join() for worker in self.workers]
         print(self.global_rewards)
+        
+        plt.figure()
         plt.grid()
-        plt.plot(self.global_rewards.values(), 'b-')
+        plt.subplots_adjust(hspace = 0.5)
+
+        plt.subplot(211)
         plt.xlabel('Episode')
         plt.ylabel('Reward')
+        plt.plot(self.global_rewards.values(), 'b-')
+
+        plt.subplot(212)
+        plt.xlabel('Episode')
+        plt.ylabel('Runtime')
+        plt.plot(self.global_runtime.values(), 'g-')
         plt.savefig("a3c.png")
-        plt.show()
+        # plt.show()
+
+
     
     def save_model(self):
         torch.save(self.global_network.state_dict(), "a3c_model.pth")
+        plt.show()
 
 
 class DecoupledA3CAgent:

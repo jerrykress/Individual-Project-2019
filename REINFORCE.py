@@ -1,5 +1,6 @@
 import gym
 import numpy as np
+import time
 from itertools import count
 import matplotlib.pyplot as plt
 
@@ -10,6 +11,8 @@ import torch.optim as optim
 from torch.distributions import Categorical
 
 
+MAX_EPISODE = 1000
+
 gamma = 0.9
 seed = 1
 render = False
@@ -19,7 +22,12 @@ log_interval = 10 #interval between training status logs (default: 10)
 env = gym.make('CartPole-v0')
 env.seed(seed)
 torch.manual_seed(seed)
-live_rewards = []
+
+episode_rewards = []
+average_rewards = []
+episode_runtime = []
+total_runtime = 0
+total_rewards = 0
 
 
 class Policy(nn.Module):
@@ -38,9 +46,8 @@ class Policy(nn.Module):
 
 
 policy = Policy()
-optimizer = optim.Adam(policy.parameters(), lr=1e-3)
+optimser = optim.Adam(policy.parameters(), lr=1e-3)
 eps = np.finfo(np.float32).eps.item()
-reward_global = []
 
 
 def select_action(state):
@@ -63,26 +70,42 @@ def finish_episode():
     rewards = (rewards - rewards.mean()) / (rewards.std() + eps)
     for log_prob, reward in zip(policy.probs, rewards):
         policy_loss.append(-log_prob * reward)
-    optimizer.zero_grad()
+    optimser.zero_grad()
     policy_loss = torch.cat(policy_loss).sum()
     policy_loss.backward()
-    optimizer.step()
+    optimser.step()
     del policy.rewards[:]
     del policy.probs[:]
 
-def plot(live_time):
+def plot():
     plt.ion()
     plt.grid()
-    plt.plot(live_time, 'b-')
+    plt.subplots_adjust(hspace = 0.5)
+
+    plt.subplot(311)
+    plt.title("Total Runtime: " + "{:.2f}".format(total_runtime) + " s")
     plt.xlabel('Episode')
-    plt.ylabel('Reward')
+    plt.ylabel('Episode Reward')
+    plt.plot(episode_rewards, 'b-')
+
+    plt.subplot(312)
+    plt.xlabel('Episode')
+    plt.ylabel('Average Reward')
+    plt.plot(average_rewards, 'm-')
+
+    plt.subplot(313)
+    plt.xlabel('Episode')
+    plt.ylabel('Runtime')
+    plt.plot(episode_runtime, 'g-')
     plt.pause(0.000001)
     plt.savefig("REINFORCE.png")
 
 
 if __name__ == '__main__':
     
-    for i_episode in range(1000):
+    for i_episode in range(MAX_EPISODE):
+        tic = time.time()
+
         state = env.reset()
         for t in range(200): #max time step
             action = select_action(state)
@@ -91,10 +114,12 @@ if __name__ == '__main__':
                 env.render()
             policy.rewards.append(reward)
             if done:
-                live_rewards.append(t)
+                episode_rewards.append(t)
+                total_rewards += t
+                average_rewards.append(total_rewards/(i_episode+1))
                 break
         
-        plot(live_rewards)
+        plot()
         par = [param.data for param in policy.parameters()]
         # print(i_episode, par[0], "\n", par[1], "\n", par[2], "\n", par[3], "\n")
         # print(len(par), len(par[0]), len(par[1]), len(par[2]), len(par[3]))
@@ -104,3 +129,8 @@ if __name__ == '__main__':
         finish_episode()
         if i_episode % log_interval == 0:
             print('Episode {}\tReward: {:5d}\t'.format(i_episode, t+1))
+
+        toc = time.time()
+        episode_runtime.append(toc - tic)
+        total_runtime += (toc - tic)
+

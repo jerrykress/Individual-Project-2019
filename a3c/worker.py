@@ -1,3 +1,4 @@
+import time
 import torch
 import torch.nn.functional as F 
 import torch.multiprocessing as mp
@@ -8,7 +9,7 @@ from models import TwoHeadNetwork, ValueNetwork, PolicyNetwork
 
 class Worker(mp.Process):
 
-    def __init__(self, id, env, gamma, global_network, global_optimizer, global_episode, GLOBAL_MAX_EPISODE, global_rewards):
+    def __init__(self, id, env, gamma, global_network, global_optimizer, global_episode, GLOBAL_MAX_EPISODE, global_rewards, global_runtime):
         super(Worker, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.name = "w%i" % id
@@ -21,6 +22,7 @@ class Worker(mp.Process):
         self.gamma = gamma
         self.local_network = TwoHeadNetwork(self.obs_dim, self.action_dim) 
 
+        self.global_runtime = global_runtime
         self.global_rewards = global_rewards
         self.global_network = global_network
         self.global_episode = global_episode
@@ -87,6 +89,9 @@ class Worker(mp.Process):
         episode_reward = 0
         
         while self.global_episode.value < self.GLOBAL_MAX_EPISODE:
+
+            tic = time.time()
+
             action = self.get_action(state)
             next_state, reward, done, _ = self.env.step(action)
             trajectory.append([state, action, reward, next_state, done])
@@ -107,6 +112,9 @@ class Worker(mp.Process):
                 state = self.env.reset()
             
             state = next_state
+
+            toc = time.time()
+            self.global_runtime[self.global_episode.value] = toc - tic
 
 
 class DecoupledWorker(mp.Process):

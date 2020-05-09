@@ -1,5 +1,5 @@
-import gym
-
+import time
+import gym 
 from a2c import A2CAgent
 import matplotlib.pyplot as plt
 
@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 env = gym.make("CartPole-v0")
 # obs_dim = env.observation_space.shape[0]
 # action_dim = env.action_space.n
-MAX_EPISODE = 1000
+MAX_EPISODE = 50
 MAX_STEPS = 200
 
 lr = 1e-3
@@ -15,18 +15,31 @@ gamma = 0.90
 
 agent = A2CAgent(env, gamma, lr)
 live_reward = []
+episode_runtime = []
 
-def plot(episode, live_time):
+def plot():
     plt.ion()
     plt.grid()
-    plt.plot(live_reward, 'b-')
+    plt.subplots_adjust(hspace = 0.5)
+
+    plt.subplot(211)
     plt.xlabel('Episode')
     plt.ylabel('Reward')
+    plt.plot(live_reward, 'b-')
+
+    plt.subplot(212)
+    plt.xlabel('Episode')
+    plt.ylabel('Runtime')
+    plt.plot(episode_runtime, 'g-')
+
     plt.pause(0.000001)
     plt.savefig("a2c.png")
 
 if __name__ == '__main__':
     for episode in range(MAX_EPISODE):
+
+        tic = time.time()
+
         state = env.reset()
         trajectory = [] # [[s, a, r, s', done], [], ...]
         episode_reward = 0
@@ -44,8 +57,13 @@ if __name__ == '__main__':
                 
             state = next_state
 
-        plot(episode, live_reward)
+        plot()
 
         if episode % 10 == 0:
             print("Episode " + str(episode) + ": " + str(episode_reward))
         agent.update(trajectory)
+
+        toc = time.time()
+
+        episode_runtime.append(toc-tic)
+
