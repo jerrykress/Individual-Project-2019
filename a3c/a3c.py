@@ -30,18 +30,23 @@ class A3CAgent:
 
         [worker.start() for worker in self.workers]
         [worker.join() for worker in self.workers]
-        print(self.global_rewards)
-        
-        plt.figure()
+
+        #Plotting
         plt.grid()
         plt.subplots_adjust(hspace = 0.5)
 
-        plt.subplot(211)
+        plt.subplot(311)
+        plt.title("Total Runtime: " + "{:.2f}".format(sum(self.global_runtime.values())) + " s")
         plt.xlabel('Episode')
-        plt.ylabel('Reward')
+        plt.ylabel('Episode Reward')
         plt.plot(self.global_rewards.values(), 'b-')
 
-        plt.subplot(212)
+        plt.subplot(312)
+        plt.xlabel('Episode')
+        plt.ylabel('Average Reward')
+        plt.plot([sum(self.global_rewards.values()[0:i+1])/(i+1) for i in range(len(self.global_rewards.values())) ], 'm-')
+
+        plt.subplot(313)
         plt.xlabel('Episode')
         plt.ylabel('Runtime')
         plt.plot(self.global_runtime.values(), 'g-')
@@ -52,7 +57,6 @@ class A3CAgent:
     
     def save_model(self):
         torch.save(self.global_network.state_dict(), "a3c_model.pth")
-        plt.show()
 
 
 class DecoupledA3CAgent:

@@ -12,7 +12,7 @@ class Worker(mp.Process):
     def __init__(self, id, env, gamma, global_network, global_optimizer, global_episode, GLOBAL_MAX_EPISODE, global_rewards, global_runtime):
         super(Worker, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.name = "w%i" % id
+        self.name = "Thread%i" % id
         
         self.env = env
         self.env.seed(id)
@@ -84,8 +84,9 @@ class Worker(mp.Process):
         self.local_network.load_state_dict(self.global_network.state_dict())
 
     def run(self):
+        lock = mp.Lock()
         state = self.env.reset()
-        trajectory = [] # [[s, a, r, s', done], [], ...]
+        trajectory = [] # [[s, a, r, s', done]]
         episode_reward = 0
         
         while self.global_episode.value < self.GLOBAL_MAX_EPISODE:
@@ -102,7 +103,7 @@ class Worker(mp.Process):
                     self.global_episode.value += 1
                     self.global_rewards[self.global_episode.value] = episode_reward
                 
-                print(self.name + " | episode: "+ str(self.global_episode.value) + " " + str(episode_reward))
+                print(self.name + " | episode: "+ str(self.global_episode.value) + " -> Reward: " + str(episode_reward))
 
                 self.update_global(trajectory)
                 self.sync_with_global()
@@ -114,7 +115,9 @@ class Worker(mp.Process):
             state = next_state
 
             toc = time.time()
-            self.global_runtime[self.global_episode.value] = toc - tic
+
+            with lock:
+                self.global_runtime[self.global_episode.value] = toc - tic
 
 
 class DecoupledWorker(mp.Process):
