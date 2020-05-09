@@ -14,24 +14,33 @@ lr = 1e-3
 gamma = 0.99
 
 agent = A2CAgent(env, gamma, lr)
-live_reward = []
+
+episode_rewards = []
+average_rewards = []
 episode_runtime = []
+total_runtime = 0
+total_rewards = 0
 
 def plot():
     plt.ion()
     plt.grid()
     plt.subplots_adjust(hspace = 0.5)
 
-    plt.subplot(211)
+    plt.subplot(311)
+    plt.title("Total Runtime: " + "{:.2f}".format(total_runtime) + " s")
     plt.xlabel('Episode')
-    plt.ylabel('Reward')
-    plt.plot(live_reward, 'b-')
+    plt.ylabel('Episode Reward')
+    plt.plot(episode_rewards, 'b-')
 
-    plt.subplot(212)
+    plt.subplot(312)
+    plt.xlabel('Episode')
+    plt.ylabel('Average Reward')
+    plt.plot(average_rewards, 'm-')
+
+    plt.subplot(313)
     plt.xlabel('Episode')
     plt.ylabel('Runtime')
     plt.plot(episode_runtime, 'g-')
-
     plt.pause(0.000001)
     plt.savefig("a2c.png")
 
@@ -52,7 +61,9 @@ if __name__ == '__main__':
             # env.render()
 
             if done:
-                live_reward.append(steps)
+                episode_rewards.append(steps)
+                total_rewards += steps
+                average_rewards.append(total_rewards/(episode+1))
                 break
                 
             state = next_state
@@ -64,6 +75,5 @@ if __name__ == '__main__':
         agent.update(trajectory)
 
         toc = time.time()
-
         episode_runtime.append(toc-tic)
-
+        total_runtime += (toc - tic)
