@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 env = gym.make("CartPole-v0")
 # obs_dim = env.observation_space.shape[0]
 # action_dim = env.action_space.n
-MAX_EPISODE = 50
+MAX_EPISODE = 1000
 MAX_STEPS = 200
 
 lr = 1e-3
