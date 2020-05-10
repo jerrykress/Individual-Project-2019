@@ -90,7 +90,7 @@ class DQN:
             self.epsilon *= self.epsilon_decay
 
 def plot():
-    plt.ion()
+    # plt.ion()
     plt.grid()
     plt.subplots_adjust(hspace = 0.5)
 
@@ -111,6 +111,7 @@ def plot():
     plt.plot(episode_runtime, 'g-')
     plt.pause(0.000001)
     plt.savefig("dqn.png")
+    plt.show()
  
 
 if __name__ == '__main__':
@@ -122,8 +123,7 @@ if __name__ == '__main__':
 
         state = env.reset()
         state = np.reshape(state, (1, 4))
-        max_steps = 1000
-        for i in range(max_steps):
+        for i in range(200):
             # env.render()
             action = agent.act(state)
             next_state, reward, done, _ = env.step(action)

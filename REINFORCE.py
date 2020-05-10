@@ -79,7 +79,7 @@ def finish_episode():
     del policy.probs[:]
 
 def plot():
-    plt.ion()
+    # plt.ion()
     plt.grid()
     plt.subplots_adjust(hspace = 0.5)
 
