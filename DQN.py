@@ -37,11 +37,11 @@ class DQN:
         self.action_space = action_space
         self.state_space = state_space
         self.epsilon = 1
-        self.gamma = .99
+        self.gamma = 0.99
         self.batch_size = 50
         self.epsilon_min = .01
         self.epsilon_decay = .99
-        self.learning_rate = 0.001
+        self.lr = 0.001
         self.memory = deque(maxlen=10000)
         self.model = self.build_model()
 
@@ -51,13 +51,10 @@ class DQN:
         model.add(Dense(128, input_shape=(self.state_space,), activation='relu'))
         model.add(Dense(128, activation='relu'))
         model.add(Dense(self.action_space, activation='linear'))
-        model.compile(loss='mse', optimizer=adam(lr=self.learning_rate))
+        model.compile(loss='mse', optimizer=adam(lr=self.lr))
         return model
 
-    def memorise(self, state, action, reward, next_state, done):
-        self.memory.append((state, action, reward, next_state, done))
-
-    def act(self, state):
+    def get_action(self, state):
 
         if np.random.rand() <= self.epsilon:
             return random.randrange(self.action_space)
@@ -69,12 +66,12 @@ class DQN:
         if len(self.memory) < self.batch_size:
             return
 
-        minibatch = random.sample(self.memory, self.batch_size)
-        states = np.array([i[0] for i in minibatch])
-        actions = np.array([i[1] for i in minibatch])
-        rewards = np.array([i[2] for i in minibatch])
-        next_states = np.array([i[3] for i in minibatch])
-        dones = np.array([i[4] for i in minibatch])
+        minibatch =    random.sample(self.memory, self.batch_size)
+        states =       np.array([sars[0] for sars in minibatch])
+        actions =      np.array([sars[1] for sars in minibatch])
+        rewards =      np.array([sars[2] for sars in minibatch])
+        next_states =  np.array([sars[3] for sars in minibatch])
+        dones =        np.array([sars[4] for sars in minibatch])
 
         states = np.squeeze(states)
         next_states = np.squeeze(next_states)
@@ -125,10 +122,10 @@ if __name__ == '__main__':
         state = np.reshape(state, (1, 4))
         for i in range(200):
             # env.render()
-            action = agent.act(state)
+            action = agent.get_action(state)
             next_state, reward, done, _ = env.step(action)
             next_state = np.reshape(next_state, (1, 4))
-            agent.memorise(state, action, reward, next_state, done)
+            agent.memory.append((state, action, reward, next_state, done))
             state = next_state
             agent.replay()
             if done:
