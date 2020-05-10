@@ -43,6 +43,7 @@ def plot():
     plt.plot(episode_runtime, 'g-')
     plt.pause(0.000001)
     plt.savefig("a2c.png")
+    plt.show()
 
 if __name__ == '__main__':
     for episode in range(MAX_EPISODE):
@@ -68,7 +69,7 @@ if __name__ == '__main__':
                 
             state = next_state
 
-        plot()
+        # plot()
 
         if episode % 10 == 0:
             print("Episode " + str(episode) + ": " + str(episode_reward))
@@ -77,3 +78,5 @@ if __name__ == '__main__':
         toc = time.time()
         episode_runtime.append(toc-tic)
         total_runtime += (toc - tic)
+    
+    plot()

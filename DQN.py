@@ -136,10 +136,12 @@ if __name__ == '__main__':
                 episode_rewards.append(i+1)
                 total_rewards += (i+1)
                 average_rewards.append(total_rewards/(episode+1))
-                plot()
+                # plot()
                 break
         
         toc = time.time()
 
         episode_runtime.append(toc-tic)
         total_runtime += (toc-tic)
+    
+    plot()

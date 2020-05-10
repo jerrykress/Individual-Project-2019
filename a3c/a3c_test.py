@@ -16,7 +16,7 @@ if __name__ == "__main__":
     env = gym.make("CartPole-v0")
     gamma = 0.99
     lr = 1e-3
-    GLOBAL_MAX_EPISODE = 1000
+    GLOBAL_MAX_EPISODE = 10000
 
     train_twoHeaded()
     # train_decoupled()

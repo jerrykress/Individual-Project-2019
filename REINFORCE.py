@@ -100,6 +100,7 @@ def plot():
     plt.plot(episode_runtime, 'g-')
     plt.pause(0.000001)
     plt.savefig("REINFORCE.png")
+    plt.show()
 
 
 if __name__ == '__main__':
@@ -120,7 +121,7 @@ if __name__ == '__main__':
                 average_rewards.append(total_rewards/(i_episode+1))
                 break
         
-        plot()
+        # plot()
         par = [param.data for param in policy.parameters()]
         # print(i_episode, par[0], "\n", par[1], "\n", par[2], "\n", par[3], "\n")
         # print(len(par), len(par[0]), len(par[1]), len(par[2]), len(par[3]))
@@ -135,3 +136,4 @@ if __name__ == '__main__':
         episode_runtime.append(toc - tic)
         total_runtime += (toc - tic)
 
+    plot()
