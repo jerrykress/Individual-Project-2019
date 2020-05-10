@@ -69,7 +69,6 @@ class A2CAgent():
         
     def update(self, trajectory):
         loss = self.compute_loss(trajectory)
-
         self.optimiser.zero_grad()
         loss.backward()
         self.optimiser.step()

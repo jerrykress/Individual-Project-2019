@@ -5,13 +5,13 @@ import torch.nn.functional as F
 
 class ACNetwork(nn.Module):
 
-    def __init__(self, input_dim, output_dim):
+    def __init__(self, observ_dim, action_dim):
         super(ACNetwork, self).__init__()
         #policy network
-        self.policy1 = nn.Linear(input_dim, 256) 
-        self.policy2 = nn.Linear(256, output_dim)
+        self.policy1 = nn.Linear(observ_dim, 256) 
+        self.policy2 = nn.Linear(256, action_dim)
         #value network
-        self.value1 = nn.Linear(input_dim, 256)
+        self.value1 = nn.Linear(observ_dim, 256)
         self.value2 = nn.Linear(256, 1)
         
     def forward(self, state):

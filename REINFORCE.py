@@ -12,71 +12,74 @@ from torch.distributions import Categorical
 
 
 MAX_EPISODE = 1000
+MAX_STEPS = 200
 
-gamma = 0.99 #discount factor
-lr = 1e-3
-seed = 1
-render = False
-log_interval = 10 #interval between training status logs (default: 10)
+class PolicyNetwork(nn.Module):
+    def __init__(self, observ_dim, action_dim):
+        super(PolicyNetwork, self).__init__()
+        self.fc1 = nn.Linear(observ_dim, 128)  #observation space to hidden layer
+        self.fc2 = nn.Linear(128, action_dim)  #hidden layer to action space
 
+    def forward(self, state):
+        x = F.relu(self.fc1(state))
+        x = self.fc2(x)
+        return F.softmax(x, dim=0)
 
-env = gym.make('CartPole-v0')
-env.seed(seed)
-torch.manual_seed(seed)
-
-episode_rewards = []
-average_rewards = []
-episode_runtime = []
-total_runtime = 0
-total_rewards = 0
-
-
-class Policy(nn.Module):
-    def __init__(self):
-        super(Policy, self).__init__()
-        self.fc1 = nn.Linear(4, 128)  #observation space to hidden layer
-        self.fc2 = nn.Linear(128, 2)  #hidden layer to action space
-
-        self.probs = []  #saved log space probability
-        self.rewards = []  #saved reward values
-
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        y = self.fc2(x)
-        return F.softmax(y, dim=1)
-
-
-policy = Policy()
-optimser = optim.Adam(policy.parameters(), lr=lr)
 eps = np.finfo(np.float32).eps.item()
 
+class REINFORCEAgent():
 
-def select_action(state):
-    state = torch.from_numpy(state).float().unsqueeze(0)
-    probs = policy(state)
-    m = Categorical(probs)
-    action = m.sample()
-    policy.probs.append(m.log_prob(action))
-    return action.item()
+    def __init__(self, env, gamma, lr):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
+        self.env = env
+        self.observ_dim = env.observation_space.shape[0]
+        self.action_dim = env.action_space.n
+        
+        self.gamma = gamma
+        self.lr = lr
+        
+        self.model = PolicyNetwork(self.observ_dim, self.action_dim)
+        self.optimiser = optim.Adam(self.model.parameters(), lr=self.lr)
 
+        self.saved_log_probs = []
+        self.rewards = []
 
-def finish_episode():
-    R = 0
-    policy_loss = []
-    rewards = []
-    for r in policy.rewards[::-1]:
-        R = r + gamma * R
-        rewards.insert(0, R)
-    rewards = torch.tensor(rewards)
-    rewards = (rewards - rewards.mean()) / (rewards.std() + eps)
-    for log_prob, reward in zip(policy.probs, rewards):
-        policy_loss.append(-log_prob * reward)
-    optimser.zero_grad()
-    policy_loss = torch.cat(policy_loss).sum()
-    policy_loss.backward()
-    optimser.step()
-    del policy.rewards[:]
-    del policy.probs[:]
+    def get_action(self, state):
+        # state = torch.from_numpy(state).float().unsqueeze(0)
+        state = torch.FloatTensor(state).to(self.device)
+        dist = self.model(state)
+        probs = Categorical(dist)
+        action = probs.sample()
+        self.saved_log_probs.append(probs.log_prob(action))
+
+        return action.item()
+
+    def compute_loss(self, trajectory):
+        rewards = [sars[2] for sars in trajectory]
+        
+        # compute discounted rewards
+        R = 0
+        discounted_rewards = []
+        for r in rewards:
+            R = r + 0.99 * R
+            discounted_rewards.insert(0, R)
+        discounted_rewards = torch.tensor(discounted_rewards)
+
+        policy_loss = []
+        discounted_rewards = (discounted_rewards - discounted_rewards.mean()) / (discounted_rewards.std())
+        for log_prob, reward in zip(self.saved_log_probs, discounted_rewards):
+            policy_loss.append(-log_prob * reward)
+        
+        return torch.stack(policy_loss).sum()
+
+    def update(self, trajectory):
+        loss = self.compute_loss(trajectory)
+        self.optimiser.zero_grad()
+        loss.backward()
+        self.optimiser.step()
+        del self.rewards[:]
+        del self.saved_log_probs[:]
 
 def plot():
     # plt.ion()
@@ -104,34 +107,43 @@ def plot():
 
 
 if __name__ == '__main__':
+
+    env = gym.make('CartPole-v0')
+    gamma = 0.99
+    lr = 1e-3
+    agent = REINFORCEAgent(env, gamma, lr)
+
+    episode_rewards = []
+    average_rewards = []
+    episode_runtime = []
+    total_runtime = 0
+    total_rewards = 0
     
     for i_episode in range(MAX_EPISODE):
         tic = time.time()
-
+        episode_reward = 0
+        trajectory = [] # [[s, a, r, s', done]]
         state = env.reset()
-        for t in range(200): #max time step
-            action = select_action(state)
-            state, reward, done, _ = env.step(action)
-            if render:
-                env.render()
-            policy.rewards.append(reward)
+
+        for t in range(MAX_STEPS):
+            action = agent.get_action(state)
+            next_state, reward, done, _ = env.step(action)
+            trajectory.append([state, action, reward, next_state, done])
+            episode_reward += reward
+            # env.render()
+
             if done:
                 episode_rewards.append(t)
                 total_rewards += t
                 average_rewards.append(total_rewards/(i_episode+1))
                 break
+
+            state = next_state
         
         # plot()
-        par = [param.data for param in policy.parameters()]
-        # print(i_episode, par[0], "\n", par[1], "\n", par[2], "\n", par[3], "\n")
-        # print(len(par), len(par[0]), len(par[1]), len(par[2]), len(par[3]))
-        # for name, param in policy.named_parameters():
-        #     print(name)
 
-        finish_episode()
-        if i_episode % log_interval == 0:
-            print('Episode {}\tReward: {:5d}\t'.format(i_episode, t+1))
-
+        print('Episode {}\tReward: {:5d}\t'.format(i_episode, t+1))
+        agent.update(trajectory)
         toc = time.time()
         episode_runtime.append(toc - tic)
         total_runtime += (toc - tic)
