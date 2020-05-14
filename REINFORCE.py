@@ -1,9 +1,7 @@
-import gym
-import numpy as np
 import time
 from itertools import count
 import matplotlib.pyplot as plt
-
+import gym
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -25,8 +23,6 @@ class PolicyNetwork(nn.Module):
         x = self.fc2(x)
         return F.softmax(x, dim=0)
 
-eps = np.finfo(np.float32).eps.item()
-
 class REINFORCEAgent():
 
     def __init__(self, env, gamma, lr):
@@ -46,7 +42,6 @@ class REINFORCEAgent():
         self.rewards = []
 
     def get_action(self, state):
-        # state = torch.from_numpy(state).float().unsqueeze(0)
         state = torch.FloatTensor(state).to(self.device)
         dist = self.model(state)
         probs = Categorical(dist)
@@ -66,10 +61,8 @@ class REINFORCEAgent():
             discounted_rewards.insert(0, R)
         discounted_rewards = torch.tensor(discounted_rewards)
 
-        policy_loss = []
         discounted_rewards = (discounted_rewards - discounted_rewards.mean()) / (discounted_rewards.std())
-        for log_prob, reward in zip(self.saved_log_probs, discounted_rewards):
-            policy_loss.append(-log_prob * reward)
+        policy_loss = [-log_prob * reward for log_prob, reward in zip(self.saved_log_probs, discounted_rewards)]
         
         return torch.stack(policy_loss).sum()
 
@@ -148,4 +141,4 @@ if __name__ == '__main__':
         episode_runtime.append(toc - tic)
         total_runtime += (toc - tic)
 
-    plot()
+    # plot()

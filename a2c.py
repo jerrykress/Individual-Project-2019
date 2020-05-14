@@ -139,4 +139,4 @@ if __name__ == '__main__':
         episode_runtime.append(toc-tic)
         total_runtime += (toc - tic)
     
-    plot(total_runtime, episode_rewards, average_rewards, episode_runtime)
+    # plot(total_runtime, episode_rewards, average_rewards, episode_runtime)

@@ -30,15 +30,13 @@ total_runtime = 0
 
 class DQN:
 
-    """ Implementation of deep q learning algorithm """
-
     def __init__(self, action_space, state_space):
 
         self.action_space = action_space
         self.state_space = state_space
         self.epsilon = 1
         self.gamma = 0.99
-        self.batch_size = 50
+        self.batch_size = 32
         self.epsilon_min = .01
         self.epsilon_decay = .99
         self.lr = 0.001
@@ -141,4 +139,4 @@ if __name__ == '__main__':
         episode_runtime.append(toc-tic)
         total_runtime += (toc-tic)
     
-    plot()
+    # plot()
