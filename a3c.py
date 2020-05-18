@@ -8,7 +8,8 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 from models import ACNetwork
 
-# mp.set_start_method('spawn', force=True)
+mp.set_start_method('spawn', force=True)
+
 MAX_EPISODE = 1000
 MAX_STEPS = 200
 GAMMA = 0.99
@@ -21,11 +22,10 @@ class A3CAgent:
     
     def __init__(self, env, gamma, lr):
         self.env = env
-
         self.gamma = gamma
         self.lr = lr
-        self.global_episode = mp.Value('i', 0)
 
+        self.global_episode = mp.Value('i', 0)
         self.global_rewards = mp.Manager().dict()
         self.global_runtime = mp.Manager().dict()
         self.global_network = ACNetwork(self.env.observation_space.shape[0], self.env.action_space.n)
@@ -66,10 +66,10 @@ class Worker(mp.Process):
     def __init__(self, id, env, gamma, global_network, global_optimizer, global_episode, global_rewards, global_runtime):
         super(Worker, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.name = "Thread%i" % id
+        self.name = "Thread: %i" % id
         
         self.env = env
-        self.env.seed(id)
+        self.env.seed(id) #use different environment for different agents
         self.obs_dim = env.observation_space.shape[0]
         self.action_dim = env.action_space.n
 
@@ -91,46 +91,39 @@ class Worker(mp.Process):
         return probs.sample().cpu().detach().item()
     
     def compute_loss(self, trajectory):
-        states = torch.FloatTensor([sars[0] for sars in trajectory]).to(self.device)
-        actions = torch.LongTensor([sars[1] for sars in trajectory]).view(-1, 1).to(self.device)
+        states =  torch.FloatTensor([sars[0] for sars in trajectory]).to(self.device)
+        actions = torch.LongTensor( [sars[1] for sars in trajectory]).view(-1, 1).to(self.device)
         rewards = torch.FloatTensor([sars[2] for sars in trajectory]).to(self.device)
         
         # compute discounted rewards
-        discounted_rewards = [torch.sum(torch.FloatTensor([self.gamma**i for i in range(rewards[j:].size(0))]) * rewards[j:]) for j in range(rewards.size(0))]
+        discounted_rewards = torch.FloatTensor([sum([self.gamma**(n-i)*rewards[i] for i in range(n+1)]) for n in list(reversed(range(len(rewards))))])
+        target_values = rewards.view(-1, 1) + torch.FloatTensor(discounted_rewards).view(-1, 1).to(self.device)
         
-        logits, values = self.local_network.forward(states)
+        logits, actual_values = self.local_network.forward(states)
         dists = F.softmax(logits, dim=1)
         probs = Categorical(dists)
         
         # compute value loss
-        value_targets = rewards.view(-1, 1) + torch.FloatTensor(discounted_rewards).view(-1, 1).to(self.device)
-        value_loss = F.mse_loss(values, value_targets.detach())
+        value_loss = F.mse_loss(actual_values, target_values.detach())
         
         # compute entropy bonus
-        entropy = []
-        for dist in dists:
-            entropy.append(-torch.sum(dist.mean() * torch.log(dist)))
-        entropy = torch.stack(entropy).sum()
+        entropy = torch.stack([-torch.sum(dist.mean() * torch.log(dist)) for dist in dists]).sum()
         
         # compute policy loss
-        advantage = value_targets - values
-        policy_loss = -probs.log_prob(actions.view(actions.size(0))).view(-1, 1) * advantage.detach()
-        policy_loss = policy_loss.mean()
+        advantage = target_values - actual_values
+        policy_loss = (-probs.log_prob(actions.view(actions.size(0))).view(-1, 1) * advantage.detach()).mean()
         
-        total_loss = policy_loss + value_loss - 0.001 * entropy 
-        return total_loss
+        return policy_loss + value_loss - 0.001 * entropy 
 
-    def update_global(self, trajectory):
+    def push_to_global(self, trajectory):
         loss = self.compute_loss(trajectory)
-        
         self.global_optimizer.zero_grad()
         loss.backward()
-        # propagate local gradients to global parameters
         for local_params, global_params in zip(self.local_network.parameters(), self.global_network.parameters()):
             global_params._grad = local_params._grad
         self.global_optimizer.step()
 
-    def sync_with_global(self):
+    def pull_from_global(self):
         self.local_network.load_state_dict(self.global_network.state_dict())
 
     def run(self):
@@ -153,10 +146,10 @@ class Worker(mp.Process):
                     self.global_episode.value += 1
                     self.global_rewards[self.global_episode.value] = episode_reward
                 
-                print(self.name + " | episode: "+ str(self.global_episode.value) + " -> Reward: " + str(episode_reward))
+                print('{}\t Episode {}\tReward: {:5f}\t'.format(self.name, self.global_episode.value, episode_reward))
 
-                self.update_global(trajectory)
-                self.sync_with_global()
+                self.push_to_global(trajectory)
+                self.pull_from_global()
 
                 trajectory = []
                 episode_reward = 0
