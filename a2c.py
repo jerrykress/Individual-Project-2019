@@ -13,7 +13,7 @@ MAX_STEPS = 200
 GAMMA = 0.99
 LR = 1e-3
 
-LIVE_PLOTTING = True
+LIVE_PLOTTING = False
 RENDER = False
 
 class A2CAgent():
@@ -40,14 +40,12 @@ class A2CAgent():
         return probs.sample().cpu().detach().item()
     
     def compute_loss(self, trajectory):
-        states =      torch.FloatTensor([sars[0] for sars in trajectory]).to(self.device)
-        actions =     torch.LongTensor( [sars[1] for sars in trajectory]).view(-1, 1).to(self.device)
-        rewards =     torch.FloatTensor([sars[2] for sars in trajectory]).to(self.device)
-        next_states = torch.FloatTensor([sars[3] for sars in trajectory]).to(self.device)
-        dones =       torch.FloatTensor([sars[4] for sars in trajectory]).view(-1, 1).to(self.device)
+        states =  torch.FloatTensor([sars[0] for sars in trajectory]).to(self.device)
+        actions = torch.LongTensor( [sars[1] for sars in trajectory]).view(-1, 1).to(self.device)
+        rewards = torch.FloatTensor([sars[2] for sars in trajectory]).to(self.device)
         
         # compute discounted rewards
-        discounted_rewards = [torch.sum(torch.FloatTensor([self.gamma**i for i in range(rewards[j:].size(0))]) * rewards[j:]) for j in range(rewards.size(0))] 
+        discounted_rewards = torch.FloatTensor([sum([self.gamma**(n-i)*rewards[i] for i in range(n+1)]) for n in list(reversed(range(len(rewards))))])
         target_values = rewards.view(-1, 1) + torch.FloatTensor(discounted_rewards).view(-1, 1).to(self.device)
         
         logits, actual_values = self.model.forward(states)
@@ -58,18 +56,13 @@ class A2CAgent():
         value_loss = F.mse_loss(actual_values, target_values.detach())
         
         # compute entropy bonus
-        entropy = []
-        for dist in dists:
-            entropy.append(-torch.sum(dist.mean() * torch.log(dist)))
-        entropy = torch.stack(entropy).sum()
+        entropy = torch.stack([-torch.sum(dist.mean() * torch.log(dist)) for dist in dists]).sum()
         
         # compute policy loss
         advantage = target_values - actual_values
-        policy_loss = -probs.log_prob(actions.view(actions.size(0))).view(-1, 1) * advantage.detach()
-        policy_loss = policy_loss.mean()
+        policy_loss = (-probs.log_prob(actions.view(actions.size(0))).view(-1, 1) * advantage.detach()).mean()
         
-        total_loss = policy_loss + value_loss - 0.001 * entropy 
-        return total_loss
+        return policy_loss + value_loss - 0.001 * entropy 
         
     def update(self, trajectory):
         loss = self.compute_loss(trajectory)

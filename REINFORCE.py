@@ -56,7 +56,7 @@ class REINFORCEAgent():
 
     def compute_loss(self, trajectory):
         rewards = [sars[2] for sars in trajectory]
-        discounted_rewards = torch.tensor([sum([0.99**(n-i)*rewards[i] for i in range(n+1)]) for n in list(reversed(range(len(rewards))))])
+        discounted_rewards = torch.tensor([sum([self.gamma**(n-i)*rewards[i] for i in range(n+1)]) for n in list(reversed(range(len(rewards))))])
         discounted_rewards = (discounted_rewards - discounted_rewards.mean()) / (discounted_rewards.std())
         policy_loss = [-log_prob * reward for log_prob, reward in zip(self.saved_probs, discounted_rewards)]
         
