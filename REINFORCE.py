@@ -11,6 +11,11 @@ from torch.distributions import Categorical
 
 MAX_EPISODE = 1000
 MAX_STEPS = 200
+GAMMA = 0.99
+LR = 1e-3
+
+LIVE_PLOTTING = True
+RENDER = False
 
 class PolicyNetwork(nn.Module):
     def __init__(self, observ_dim, action_dim):
@@ -38,31 +43,22 @@ class REINFORCEAgent():
         self.model = PolicyNetwork(self.observ_dim, self.action_dim)
         self.optimiser = optim.Adam(self.model.parameters(), lr=self.lr)
 
-        self.saved_log_probs = []
-        self.rewards = []
+        self.saved_probs = []
 
     def get_action(self, state):
         state = torch.FloatTensor(state).to(self.device)
         dist = self.model(state)
         probs = Categorical(dist)
         action = probs.sample()
-        self.saved_log_probs.append(probs.log_prob(action))
+        self.saved_probs.append(probs.log_prob(action))
 
-        return action.item()
+        return action.cpu().detach().item()
 
     def compute_loss(self, trajectory):
         rewards = [sars[2] for sars in trajectory]
-        
-        # compute discounted rewards
-        R = 0
-        discounted_rewards = []
-        for r in rewards:
-            R = r + 0.99 * R
-            discounted_rewards.insert(0, R)
-        discounted_rewards = torch.tensor(discounted_rewards)
-
+        discounted_rewards = torch.tensor([sum([0.99**(n-i)*rewards[i] for i in range(n+1)]) for n in list(reversed(range(len(rewards))))])
         discounted_rewards = (discounted_rewards - discounted_rewards.mean()) / (discounted_rewards.std())
-        policy_loss = [-log_prob * reward for log_prob, reward in zip(self.saved_log_probs, discounted_rewards)]
+        policy_loss = [-log_prob * reward for log_prob, reward in zip(self.saved_probs, discounted_rewards)]
         
         return torch.stack(policy_loss).sum()
 
@@ -71,11 +67,12 @@ class REINFORCEAgent():
         self.optimiser.zero_grad()
         loss.backward()
         self.optimiser.step()
-        del self.rewards[:]
-        del self.saved_log_probs[:]
+        del self.saved_probs[:]
 
-def plot():
-    # plt.ion()
+def plot(total_runtime, episode_rewards, average_rewards, episode_runtime):
+    if LIVE_PLOTTING:
+        plt.ion()
+
     plt.grid()
     plt.subplots_adjust(hspace = 0.5)
 
@@ -102,9 +99,7 @@ def plot():
 if __name__ == '__main__':
 
     env = gym.make('CartPole-v0')
-    gamma = 0.99
-    lr = 1e-3
-    agent = REINFORCEAgent(env, gamma, lr)
+    agent = REINFORCEAgent(env, GAMMA, LR)
 
     episode_rewards = []
     average_rewards = []
@@ -112,33 +107,36 @@ if __name__ == '__main__':
     total_runtime = 0
     total_rewards = 0
     
-    for i_episode in range(MAX_EPISODE):
+    for episode in range(MAX_EPISODE):
         tic = time.time()
         episode_reward = 0
         trajectory = [] # [[s, a, r, s', done]]
         state = env.reset()
 
-        for t in range(MAX_STEPS):
+        for step in range(MAX_STEPS):
             action = agent.get_action(state)
             next_state, reward, done, _ = env.step(action)
             trajectory.append([state, action, reward, next_state, done])
             episode_reward += reward
-            # env.render()
+
+            if RENDER:
+                env.render()
 
             if done:
-                episode_rewards.append(t)
-                total_rewards += t
-                average_rewards.append(total_rewards/(i_episode+1))
+                episode_rewards.append(step)
+                total_rewards += step
+                average_rewards.append(total_rewards/(episode+1))
                 break
 
             state = next_state
         
-        # plot()
+        if LIVE_PLOTTING:
+            plot(total_runtime, episode_rewards, average_rewards, episode_runtime)
 
-        print('Episode {}\tReward: {:5d}\t'.format(i_episode, t+1))
+        print('Episode {}\tReward: {:5f}\t'.format(episode, episode_reward))
         agent.update(trajectory)
         toc = time.time()
         episode_runtime.append(toc - tic)
         total_runtime += (toc - tic)
 
-    # plot()
+    plot(total_runtime, episode_rewards, average_rewards, episode_runtime)

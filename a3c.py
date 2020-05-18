@@ -9,22 +9,28 @@ from torch.distributions import Categorical
 from models import ACNetwork
 
 # mp.set_start_method('spawn', force=True)
+MAX_EPISODE = 1000
+MAX_STEPS = 200
+GAMMA = 0.99
+LR = 1e-3
+
+LIVE_PLOTTING = False
+RENDER = False
 
 class A3CAgent:
     
-    def __init__(self, env, gamma, lr, global_max_episode):
+    def __init__(self, env, gamma, lr):
         self.env = env
 
         self.gamma = gamma
         self.lr = lr
         self.global_episode = mp.Value('i', 0)
-        self.GLOBAL_MAX_EPISODE = global_max_episode
 
         self.global_rewards = mp.Manager().dict()
         self.global_runtime = mp.Manager().dict()
         self.global_network = ACNetwork(self.env.observation_space.shape[0], self.env.action_space.n)
         self.global_optimizer = optim.Adam(self.global_network.parameters(), lr=lr) 
-        self.workers = [Worker(i, env, self.gamma, self.global_network, self.global_optimizer, self.global_episode, self.GLOBAL_MAX_EPISODE, self.global_rewards, self.global_runtime) for i in range(7)]
+        self.workers = [Worker(i, env, self.gamma, self.global_network, self.global_optimizer, self.global_episode, self.global_rewards, self.global_runtime) for i in range(mp.cpu_count())]
     
     def train(self):
         print("Training on {} cores".format(mp.cpu_count()))
@@ -33,34 +39,31 @@ class A3CAgent:
         [worker.join() for worker in self.workers]
 
         #Plotting
-        # plt.grid()
-        # plt.subplots_adjust(hspace = 0.5)
+        plt.grid()
+        plt.subplots_adjust(hspace = 0.5)
 
-        # plt.subplot(311)
-        # plt.title("Total Runtime: " + "{:.2f}".format(sum(self.global_runtime.values())) + " s")
-        # plt.xlabel('Episode')
-        # plt.ylabel('Episode Reward')
-        # plt.plot(self.global_rewards.values(), 'b-')
+        plt.subplot(311)
+        plt.title("Total Runtime: " + "{:.2f}".format(sum(self.global_runtime.values())) + " s")
+        plt.xlabel('Episode')
+        plt.ylabel('Episode Reward')
+        plt.plot(self.global_rewards.values(), 'b-')
 
-        # plt.subplot(312)
-        # plt.xlabel('Episode')
-        # plt.ylabel('Average Reward')
-        # plt.plot([sum(self.global_rewards.values()[0:i+1])/(i+1) for i in range(len(self.global_rewards.values())) ], 'm-')
+        plt.subplot(312)
+        plt.xlabel('Episode')
+        plt.ylabel('Average Reward')
+        plt.plot([sum(self.global_rewards.values()[0:i+1])/(i+1) for i in range(len(self.global_rewards.values())) ], 'm-')
 
-        # plt.subplot(313)
-        # plt.xlabel('Episode')
-        # plt.ylabel('Runtime')
-        # plt.plot(self.global_runtime.values(), 'g-')
-        # plt.savefig("a3c.png")
-        # plt.show()
-    
-    def save_model(self):
-        torch.save(self.global_network.state_dict(), "a3c_model.pth")
+        plt.subplot(313)
+        plt.xlabel('Episode')
+        plt.ylabel('Runtime')
+        plt.plot(self.global_runtime.values(), 'g-')
+        plt.savefig("a3c.png")
+        plt.show()
 
 
 class Worker(mp.Process):
 
-    def __init__(self, id, env, gamma, global_network, global_optimizer, global_episode, GLOBAL_MAX_EPISODE, global_rewards, global_runtime):
+    def __init__(self, id, env, gamma, global_network, global_optimizer, global_episode, global_rewards, global_runtime):
         super(Worker, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.name = "Thread%i" % id
@@ -78,7 +81,6 @@ class Worker(mp.Process):
         self.global_network = global_network
         self.global_episode = global_episode
         self.global_optimizer = global_optimizer
-        self.GLOBAL_MAX_EPISODE = GLOBAL_MAX_EPISODE
     
     def get_action(self, state):
         state = torch.FloatTensor(state).to(self.device)
@@ -92,12 +94,9 @@ class Worker(mp.Process):
         states = torch.FloatTensor([sars[0] for sars in trajectory]).to(self.device)
         actions = torch.LongTensor([sars[1] for sars in trajectory]).view(-1, 1).to(self.device)
         rewards = torch.FloatTensor([sars[2] for sars in trajectory]).to(self.device)
-        next_states = torch.FloatTensor([sars[3] for sars in trajectory]).to(self.device)
-        dones = torch.FloatTensor([sars[4] for sars in trajectory]).view(-1, 1).to(self.device)
         
         # compute discounted rewards
-        discounted_rewards = [torch.sum(torch.FloatTensor([self.gamma**i for i in range(rewards[j:].size(0))])\
-             * rewards[j:]) for j in range(rewards.size(0))]  # sorry, not the most readable code.
+        discounted_rewards = [torch.sum(torch.FloatTensor([self.gamma**i for i in range(rewards[j:].size(0))]) * rewards[j:]) for j in range(rewards.size(0))]
         
         logits, values = self.local_network.forward(states)
         dists = F.softmax(logits, dim=1)
@@ -140,7 +139,7 @@ class Worker(mp.Process):
         trajectory = [] # [[s, a, r, s', done]]
         episode_reward = 0
         
-        while self.global_episode.value < self.GLOBAL_MAX_EPISODE:
+        while self.global_episode.value < MAX_EPISODE:
 
             tic = time.time()
 
@@ -173,10 +172,5 @@ class Worker(mp.Process):
 
 if __name__ == "__main__":
     env = gym.make("CartPole-v0")
-    gamma = 0.99
-    lr = 1e-3
-    GLOBAL_MAX_EPISODE = 1000
-
-    agent = A3CAgent(env, gamma, lr, GLOBAL_MAX_EPISODE)
+    agent = A3CAgent(env, GAMMA, LR)
     agent.train()
-    agent.save_model()

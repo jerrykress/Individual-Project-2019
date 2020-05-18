@@ -10,6 +10,11 @@ from models import ACNetwork
 
 MAX_EPISODE = 1000
 MAX_STEPS = 200
+GAMMA = 0.99
+LR = 1e-3
+
+LIVE_PLOTTING = True
+RENDER = False
 
 class A2CAgent():
 
@@ -42,16 +47,15 @@ class A2CAgent():
         dones =       torch.FloatTensor([sars[4] for sars in trajectory]).view(-1, 1).to(self.device)
         
         # compute discounted rewards
-        discounted_rewards = [torch.sum(torch.FloatTensor([self.gamma**i for i in range(rewards[j:].size(0))])\
-             * rewards[j:]) for j in range(rewards.size(0))] 
-        value_targets = rewards.view(-1, 1) + torch.FloatTensor(discounted_rewards).view(-1, 1).to(self.device)
+        discounted_rewards = [torch.sum(torch.FloatTensor([self.gamma**i for i in range(rewards[j:].size(0))]) * rewards[j:]) for j in range(rewards.size(0))] 
+        target_values = rewards.view(-1, 1) + torch.FloatTensor(discounted_rewards).view(-1, 1).to(self.device)
         
-        logits, values = self.model.forward(states)
+        logits, actual_values = self.model.forward(states)
         dists = F.softmax(logits, dim=1)
         probs = Categorical(dists)
         
         # compute value loss
-        value_loss = F.mse_loss(values, value_targets.detach())
+        value_loss = F.mse_loss(actual_values, target_values.detach())
         
         # compute entropy bonus
         entropy = []
@@ -60,7 +64,7 @@ class A2CAgent():
         entropy = torch.stack(entropy).sum()
         
         # compute policy loss
-        advantage = value_targets - values
+        advantage = target_values - actual_values
         policy_loss = -probs.log_prob(actions.view(actions.size(0))).view(-1, 1) * advantage.detach()
         policy_loss = policy_loss.mean()
         
@@ -75,7 +79,9 @@ class A2CAgent():
 
 
 def plot(total_runtime, episode_rewards, average_rewards, episode_runtime):
-    # plt.ion()
+    if LIVE_PLOTTING:
+        plt.ion()
+
     plt.grid()
     plt.subplots_adjust(hspace = 0.5)
 
@@ -102,9 +108,7 @@ def plot(total_runtime, episode_rewards, average_rewards, episode_runtime):
 if __name__ == '__main__':
 
     env = gym.make("CartPole-v0")
-    gamma = 0.99
-    lr = 1e-3
-    agent = A2CAgent(env, gamma, lr)
+    agent = A2CAgent(env, GAMMA, LR)
 
     episode_rewards = []
     average_rewards = []
@@ -123,7 +127,9 @@ if __name__ == '__main__':
             next_state, reward, done, _ = env.step(action)
             trajectory.append([state, action, reward, next_state, done])
             episode_reward += reward
-            # env.render()
+
+            if RENDER:
+                env.render()
 
             if done:
                 episode_rewards.append(steps)
@@ -133,10 +139,13 @@ if __name__ == '__main__':
                 
             state = next_state
 
-        print("Episode " + str(episode) + ": " + str(episode_reward))
+        if LIVE_PLOTTING:
+             plot(total_runtime, episode_rewards, average_rewards, episode_runtime)
+ 
+        print('Episode {}\tReward: {:5f}\t'.format(episode, episode_reward))
         agent.update(trajectory)
         toc = time.time()
         episode_runtime.append(toc-tic)
         total_runtime += (toc - tic)
     
-    # plot(total_runtime, episode_rewards, average_rewards, episode_runtime)
+    plot(total_runtime, episode_rewards, average_rewards, episode_runtime)
