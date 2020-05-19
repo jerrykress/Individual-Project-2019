@@ -1,10 +1,3 @@
-#  A pole is attached by an un-actuated joint to a cart,
-#  which moves along a frictionless track. The system is controlled by applying a force of +1 or -1 to the cart.
-#  The pendulum starts upright, and the goal is to prevent it from falling over.
-#  A reward of +1 is provided for every timestep that the pole remains upright.
-#  The episode ends when the pole is more than 15 degrees from vertical,
-#  or the cart moves more than 2.4 units from the center.
-
 import time
 import gym
 import random
@@ -16,17 +9,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 MAX_EPISODE = 1000
+MAX_STEPS = 200
+GAMMA = 0.99
+LR = 1e-3
 
-env = gym.make('CartPole-v0')
-env.seed(0)
-np.random.seed(0)
-
-episode_rewards = []
-episode_runtime = []
-average_rewards = []
-total_rewards = 0
-total_runtime = 0
-
+LIVE_PLOTTING = True
+RENDER = False
 
 class DQN:
 
@@ -74,7 +62,7 @@ class DQN:
         states = np.squeeze(states)
         next_states = np.squeeze(next_states)
 
-        targets = rewards + self.gamma*(np.amax(self.model.predict_on_batch(next_states), axis=1))*(1-dones)
+        targets = rewards + self.gamma * (np.max(self.model.predict_on_batch(next_states), axis=1)) * (1 - dones)
         targets_full = self.model.predict_on_batch(states)
 
         ind = np.array([i for i in range(self.batch_size)])
@@ -84,8 +72,10 @@ class DQN:
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
-def plot():
-    # plt.ion()
+def plot(total_runtime, episode_rewards, average_rewards, episode_runtime):
+    if LIVE_PLOTTING:
+        plt.ion()
+
     plt.grid()
     plt.subplots_adjust(hspace = 0.5)
 
@@ -110,33 +100,48 @@ def plot():
  
 
 if __name__ == '__main__':
+    env = gym.make('CartPole-v0')
+    env.seed(0)
+    np.random.seed(0)
+
+    episode_rewards = []
+    episode_runtime = []
+    average_rewards = []
+    total_rewards = 0
+    total_runtime = 0
 
     agent = DQN(env.action_space.n, env.observation_space.shape[0])
 
     for episode in range(MAX_EPISODE):
         tic = time.time()
-
         state = env.reset()
         state = np.reshape(state, (1, 4))
-        for i in range(200):
-            # env.render()
+
+        for i in range(MAX_STEPS):
             action = agent.get_action(state)
             next_state, reward, done, _ = env.step(action)
             next_state = np.reshape(next_state, (1, 4))
             agent.memory.append((state, action, reward, next_state, done))
             state = next_state
             agent.replay()
+
+            if RENDER:
+                env.render()
+                
             if done:
                 print("Episode {}: {}".format(episode, i+1))
                 episode_rewards.append(i+1)
                 total_rewards += (i+1)
                 average_rewards.append(total_rewards/(episode+1))
-                # plot()
+                
                 break
-        
+
+        if LIVE_PLOTTING:
+            plot(total_runtime, episode_rewards, average_rewards, episode_runtime)
+
         toc = time.time()
 
         episode_runtime.append(toc-tic)
         total_runtime += (toc-tic)
     
-    # plot()
+    plot(total_runtime, episode_rewards, average_rewards, episode_runtime)
