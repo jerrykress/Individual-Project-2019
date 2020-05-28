@@ -1,16 +1,20 @@
 import time
-import gym
 import random
+import numpy as np
+import matplotlib.pyplot as plt
+
+import gym
 from keras import Sequential
 from collections import deque
 from keras.layers import Dense
 from keras.optimizers import adam
-import matplotlib.pyplot as plt
-import numpy as np
 
 MAX_EPISODE = 1000
 MAX_STEPS = 200
+
+BATCH = 32
 GAMMA = 0.99
+DECAY = 0.99
 LR = 1e-3
 
 LIVE_PLOTTING = True
@@ -19,58 +23,47 @@ RENDER = False
 class DQN:
 
     def __init__(self, action_space, state_space):
-
         self.action_space = action_space
         self.state_space = state_space
-        self.epsilon = 1
-        self.gamma = 0.99
-        self.batch_size = 32
-        self.epsilon_min = .01
-        self.epsilon_decay = .99
-        self.lr = 0.001
-        self.memory = deque(maxlen=10000)
-        self.model = self.build_model()
-
-    def build_model(self):
 
         model = Sequential()
         model.add(Dense(128, input_shape=(self.state_space,), activation='relu'))
         model.add(Dense(128, activation='relu'))
         model.add(Dense(self.action_space, activation='linear'))
-        model.compile(loss='mse', optimizer=adam(lr=self.lr))
-        return model
+        model.compile(loss='mse', optimizer=adam(lr=LR))
 
-    def get_action(self, state):
+        self.model = model
+        self.epsilon = 1
+        self.epsilon_min = 0.01
+        self.memory = deque(maxlen=10000)
 
+    def get_action(self, state): #sample action from policy
         if np.random.rand() <= self.epsilon:
             return random.randrange(self.action_space)
-        act_values = self.model.predict(state)
-        return np.argmax(act_values[0])
+        action_values = self.model.predict(state)
+        return np.argmax(action_values[0])
 
-    def replay(self):
-
-        if len(self.memory) < self.batch_size:
+    def replay(self): #memory replay
+        if len(self.memory) < BATCH:
             return
 
-        minibatch =    random.sample(self.memory, self.batch_size)
-        states =       np.array([sars[0] for sars in minibatch])
-        actions =      np.array([sars[1] for sars in minibatch])
-        rewards =      np.array([sars[2] for sars in minibatch])
-        next_states =  np.array([sars[3] for sars in minibatch])
-        dones =        np.array([sars[4] for sars in minibatch])
+        batch =        random.sample(self.memory, BATCH)
+        states =       np.array([sars[0] for sars in batch])
+        actions =      np.array([sars[1] for sars in batch])
+        rewards =      np.array([sars[2] for sars in batch])
+        next_states =  np.array([sars[3] for sars in batch])
+        dones =        np.array([sars[4] for sars in batch])
 
         states = np.squeeze(states)
         next_states = np.squeeze(next_states)
 
-        targets = rewards + self.gamma * (np.max(self.model.predict_on_batch(next_states), axis=1)) * (1 - dones)
+        targets = rewards + GAMMA * (np.max(self.model.predict_on_batch(next_states), axis=1)) * (1 - dones)
         targets_full = self.model.predict_on_batch(states)
+        targets_full[[range(BATCH)], [actions]] = targets
 
-        ind = np.array([i for i in range(self.batch_size)])
-        targets_full[[ind], [actions]] = targets
-
-        self.model.fit(states, targets_full, epochs=1, verbose=0)
+        self.model.fit(states, targets_full, epochs=1, verbose=False)
         if self.epsilon > self.epsilon_min:
-            self.epsilon *= self.epsilon_decay
+            self.epsilon *= DECAY
 
 def plot(total_runtime, episode_rewards, average_rewards, episode_runtime):
     if LIVE_PLOTTING:
